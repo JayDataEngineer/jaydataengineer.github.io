@@ -1,0 +1,96 @@
+---
+slug: pux-ray
+title: "Pux Ray"
+tagline: "A unified API for image, video, audio, 3D, and LLM generation — running on consumer GPUs in my home lab."
+index: "01"
+tier: marquee
+year: 2026
+role: "Architect + sole engineer"
+accent: cyan
+stack:
+  - Kubernetes
+  - Talos
+  - KubeRay
+  - Ray Serve
+  - Wan2GP
+  - Traefik
+  - Python
+  - Docker
+  - MCP
+links:
+  - label: GitHub
+    href: https://github.com/JayDataEngineer/pux-ray
+---
+
+Pux Ray is the home AI cluster — **Ray Serve on Talos Kubernetes**, orchestrated end-to-end. One ingress routes to a dozen model families on shared consumer GPUs. It generates images, video, audio, 3D meshes, motion, and text through a single API. MCP servers expose tools to agents and chat UIs. DAG pipelines compose multi-step workflows.
+
+## What it does
+
+| Capability | Models | Service |
+|---|---|---|
+| Image generation | Flux, Z-Image, Wan2.1 | wan2gp |
+| Image editing | QWEN Image Edit | wan2gp |
+| Video generation | Wan2.1, CogVideoX, LTX-2 | wan2gp |
+| Text-to-speech | Kokoro (sherpa-onnx), IndexTTS, eSpeak, MOSS | standalone + openmoss |
+| Speech-to-text | Faster-Whisper, VibeVoice | standalone |
+| 3D mesh generation | TRELLIS, AniGen | wan2gp |
+| Motion generation | HY-Motion, Kimodo | wan2gp |
+| Music / SFX | ACE-Step, MOSS | wan2gp |
+| LLM inference | llama.cpp (GGUF) | forge subprocess |
+| Vision analysis | YOLOv8, Florence-2, SAM2 | media-analysis MCP |
+| Web research | SearXNG + crawl4ai | web-research MCP |
+
+## The hard problem
+
+VRAM. Consumer GPUs have between 8GB and 24GB. The naive approach — one model per GPU — wastes 80% of the silicon. The cluster needed to schedule models dynamically across shared GPUs without OOM crashes, while keeping p99 latency reasonable for interactive workloads.
+
+The solution is **Wan2GP with mmgp offloading**, wrapped in Ray Serve deployment groups. Wan2GP manages model lifecycle on a single GPU (loading, offloading to CPU RAM between requests); Ray Serve handles request routing across the cluster. The result is that twelve model families coexist on hardware that traditionally could serve maybe three.
+
+## Architecture
+
+```
+┌──────────────────────────────────────────────────────┐
+│  Traefik :30080                                      │
+│  ┌──────────┐  ┌──────────┐  ┌───────────────────┐  │
+│  │ API      │  │ Studio   │  │ Editor             │  │
+│  │ ingress  │  │ UI       │  │ (React SPA)        │  │
+│  └────┬─────┘  └────┬─────┘  └────────┬──────────┘  │
+│       │              │                  │             │
+│  ┌────▼──────────────▼──────────────────▼──────────┐ │
+│  │  Ray Serve (KubeRay)                             │ │
+│  │  ┌─────────┐  ┌─────────┐  ┌─────────────────┐  │ │
+│  │  │ Forge   │  │ CPU     │  │ Workflow Engine  │  │ │
+│  │  │ (GPU)   │  │ Services│  │ (DAG pipelines)  │  │ │
+│  │  └────┬────┘  └─────────┘  └─────────────────┘  │ │
+│  │       │  VRAM-aware scheduling                    │ │
+│  │  ┌────▼──────────────────────────────────────┐   │ │
+│  │  │  Wan2GP (mmgp offloading, 12+ families)   │   │ │
+│  │  └───────────────────────────────────────────┘   │ │
+│  └──────────────────────────────────────────────────┘ │
+│                                                       │
+│  ┌──────────────────────────────────────────────────┐ │
+│  │  MCP Servers (standalone K8s deployments)         │ │
+│  │  media-analysis · web-research · wan2gp-studio    │ │
+│  └──────────────────────────────────────────────────┘ │
+└──────────────────────────────────────────────────────┘
+```
+
+## Why this is the harder version of the problem
+
+The easy version of "AI infra" is: spin up an H100 box, load a model, accept requests. Anyone can do that. The hard version is:
+
+- **Multi-tenant by default** — twelve model families share three GPUs, none of them can OOM the others.
+- **Cold-start aware** — loading a 7B model takes 20+ seconds. The scheduler has to predict demand and pre-warm intelligently.
+- **Failure-isolated** — if one model crashes, the others keep serving. Ray deployments are independent processes.
+- **Reachable from anywhere** — Tailscale + Traefik means I can hit the cluster from a coffee shop. Caddy on the MCP servers handles TLS.
+
+Most "AI platform" candidates have only done the easy version. This cluster runs the hard version, in my closet, for fun.
+
+## MCP integration
+
+The cluster is meaningless if agents can't reach it. Two MCP servers expose its capabilities:
+
+- **media-analysis** — vision (YOLOv8, Florence-2, SAM2), audio (transcription, diarization, fingerprinting), video (scene detection, keyframes), with HDBSCAN clustering across face + voice embeddings.
+- **web-research** — multi-engine search, smart scraping waterfall (Crawl4AI → SeleniumBase → blacklist), domain learning in Postgres, all traffic routed through a Gluetun WireGuard tunnel.
+
+Both are standalone K8s deployments, not Ray-managed, because their workloads are bursty I/O rather than sustained GPU compute.

@@ -1,0 +1,95 @@
+---
+slug: pux
+title: "PUX"
+tagline: "A contract-based agent orchestrator with three first-class interfaces (Web, TUI, MCP) and a sandboxed execution environment."
+index: "02"
+tier: marquee
+year: 2026
+role: "Architect + sole engineer"
+accent: violet
+stack:
+  - Go
+  - Bun
+  - Docker
+  - MCP
+  - Contract RPC
+links:
+  - label: GitHub
+    href: https://github.com/JayDataEngineer/auto-developer-orchestrator
+---
+
+PUX is a system for streamlined control over an AI orchestrator, with a focus on customization. It exists because every other orchestrator I tried either locked me into one provider, one interface, or one workflow.
+
+## Three interfaces, one core
+
+Most agent systems pick one interface and ship it. PUX has three, all first-class:
+
+- **Web** — the primary interface. Manages the sandbox and provides a text editor.
+- **TUI** — work in progress, for terminal-native workflows.
+- **CLI / MCP** — integrates with tools like the Hermes series.
+
+This works because the backend speaks a small **contract language**. Adding a new interface is mechanical, not architectural. The contract defines what an agent can do, what tools exist, and how state flows. Each interface renders that contract in its own idiom.
+
+## Why Go
+
+A pure TypeScript or Python backend would have been faster to prototype. I picked Go deliberately:
+
+- **Type safety across the wire.** Contract definitions are Go types; the TUI, Web, and MCP server all consume the generated types. Refactors are safe.
+- **Single-binary deploy.** No node_modules, no venv, no Docker required for the orchestrator itself.
+- **Speed for tool calls.** Heavy tool use (file ops, shell, browser) is the inner loop of an agent. Go's perf shows up here.
+
+Docker is still used for sandboxes — that's where isolation matters more than binary size.
+
+## Sandboxed execution
+
+Native to PUX:
+
+- A sandboxed **desktop** (VFS, isolated home dir).
+- A sandboxed **browser** (CDP-controlled, headless by default).
+- A **text editor** — because LLM-assisted editing in your own editor is a workflow everyone reinvents.
+- A **vision toolkit** — screen capture + Florence-2 reasoning.
+
+This gives PUX an edge on agentic web development and on integrations with Telegram or game development. Scheduled jobs (running entirely in a sandbox) are coming next.
+
+## Sovereignty as a design constraint
+
+The README's actual stated motivation is vendor lock-in. From the docs:
+
+> Stay sovereign at any step. In the fast-paced corporate world of today, it is easy to get 'locked in' to a certain provider. Issues with providers like consumer-unfriendly billing practices by companies such as Google AI can be far behind, at your own discretion. You can use Opus for planning and a local Qwen model for execution.
+
+This isn't a marketing line. It's the architecture. Provider swaps are a config change, not a code change. The orchestrator doesn't know or care whether the LLM is Opus, Sonnet, or a local Qwen running on llama.cpp.
+
+## Architecture
+
+```
+┌─────────────────────────────────────────────────┐
+│           Interfaces                            │
+│  ┌─────────┐  ┌─────────┐  ┌────────────────┐  │
+│  │   Web   │  │   TUI   │  │  CLI / MCP     │  │
+│  └────┬────┘  └────┬────┘  └───────┬────────┘  │
+│       │            │               │            │
+│       └────────────┴───────────────┘            │
+│                    │                            │
+│            ┌───────▼────────┐                   │
+│            │  Contract RPC  │                   │
+│            │   (Go core)    │                   │
+│            └───────┬────────┘                   │
+│                    │                            │
+│        ┌───────────┼───────────┐                │
+│        ▼           ▼           ▼                │
+│  ┌─────────┐ ┌─────────┐ ┌─────────────┐       │
+│  │ Skills  │ │ Sandbo- │ │  Provider   │       │
+│  │ engine  │ │ xed env │ │  routing    │       │
+│  └─────────┘ └─────────┘ └─────────────┘       │
+└─────────────────────────────────────────────────┘
+```
+
+## Quick start
+
+```bash
+git clone https://github.com/JayDataEngineer/auto-developer-orchestrator.git
+cd auto-developer-orchestrator
+task install
+```
+
+Requires Go 1.26+, Bun, and Task. Docker is optional (for sandboxes and local model serving).

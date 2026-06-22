@@ -1,0 +1,201 @@
+@import "tailwindcss";
+
+/*
+ * Design tokens. Tailwind v4 uses @theme to generate utilities, so
+ * bg-bg, text-ink, text-cyan, border-line, etc. all work out of the box.
+ */
+@theme {
+  /* surfaces */
+  --color-bg: #050507;
+  --color-bg-deep: #020203;
+  --color-surface: #0c0c11;
+  --color-surface-hi: #14141b;
+  --color-line: rgba(255, 255, 255, 0.08);
+  --color-line-bright: rgba(255, 255, 255, 0.18);
+
+  /* text */
+  --color-ink: #f5f5f7;
+  --color-ink-muted: #a1a1aa;
+  --color-ink-faint: #52525b;
+
+  /* accents */
+  --color-cyan: #00e7ff;
+  --color-magenta: #ff2bd6;
+  --color-violet: #8b5cf6;
+  --color-lime: #d4ff00;
+
+  /* fonts */
+  --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-geist-mono), ui-monospace, SFMono-Regular, monospace;
+
+  /* motion */
+  --ease-out-quint: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-in-out-quint: cubic-bezier(0.83, 0, 0.17, 1);
+  --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+
+  /* container */
+  --container-max: 1240px;
+}
+
+@layer base {
+  * {
+    border-color: var(--color-line);
+  }
+
+  html {
+    color-scheme: dark;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+
+  body {
+    background: var(--color-bg);
+    color: var(--color-ink);
+    font-family: var(--font-sans);
+    overflow-x: hidden;
+    /* Subtle noise overlay for texture */
+    background-image:
+      radial-gradient(
+        ellipse 100% 60% at 50% 0%,
+        rgba(0, 231, 255, 0.06),
+        transparent 70%
+      ),
+      radial-gradient(
+        ellipse 80% 50% at 50% 100%,
+        rgba(255, 43, 214, 0.04),
+        transparent 60%
+      );
+    background-attachment: fixed;
+  }
+
+  ::selection {
+    background: var(--color-cyan);
+    color: var(--color-bg);
+  }
+
+  /* Custom focus ring */
+  :focus-visible {
+    outline: 2px solid var(--color-cyan);
+    outline-offset: 4px;
+    border-radius: 2px;
+  }
+
+  /* Tighter scrollbar */
+  ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+  ::-webkit-scrollbar-track {
+    background: var(--color-bg);
+  }
+  ::-webkit-scrollbar-thumb {
+    background: var(--color-surface-hi);
+    border-radius: 6px;
+    border: 2px solid var(--color-bg);
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: var(--color-ink-faint);
+  }
+}
+
+@layer utilities {
+  .container-page {
+    width: 100%;
+    max-width: var(--container-max);
+    margin-inline: auto;
+    padding-inline: clamp(1.25rem, 5vw, 2.5rem);
+  }
+
+  .text-balance {
+    text-wrap: balance;
+  }
+  .text-pretty {
+    text-wrap: pretty;
+  }
+
+  /* Gradient text helper */
+  .text-gradient-cm {
+    background: linear-gradient(
+      90deg,
+      var(--color-cyan) 0%,
+      var(--color-violet) 50%,
+      var(--color-magenta) 100%
+    );
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+
+  /* Grid background for sections */
+  .bg-grid {
+    background-image:
+      linear-gradient(to right, rgba(255, 255, 255, 0.025) 1px, transparent 1px),
+      linear-gradient(to bottom, rgba(255, 255, 255, 0.025) 1px, transparent 1px);
+    background-size: 64px 64px;
+  }
+
+  .bg-dots {
+    background-image: radial-gradient(rgba(255, 255, 255, 0.07) 1px, transparent 1px);
+    background-size: 18px 18px;
+  }
+
+  /* Glow */
+  .glow-cyan {
+    box-shadow: 0 0 40px -10px var(--color-cyan);
+  }
+  .glow-magenta {
+    box-shadow: 0 0 40px -10px var(--color-magenta);
+  }
+
+  /* Grain overlay for the hero */
+  .grain::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    opacity: 0.05;
+    mix-blend-mode: overlay;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  }
+
+  /* Marquee */
+  .animate-marquee {
+    animation: marquee 60s linear infinite;
+  }
+  .animate-marquee-rev {
+    animation: marquee 60s linear infinite reverse;
+  }
+  .pause-on-hover:hover .animate-marquee,
+  .pause-on-hover:hover .animate-marquee-rev {
+    animation-play-state: paused;
+  }
+  @keyframes marquee {
+    from {
+      transform: translateX(0);
+    }
+    to {
+      transform: translateX(-50%);
+    }
+  }
+
+  /* Blinking cursor */
+  .cursor-blink::after {
+    content: "_";
+    color: var(--color-cyan);
+    animation: blink 1s steps(2) infinite;
+  }
+  @keyframes blink {
+    0%, 50% { opacity: 1; }
+    50.01%, 100% { opacity: 0; }
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

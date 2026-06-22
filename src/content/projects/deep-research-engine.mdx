@@ -1,0 +1,101 @@
+---
+slug: deep-research-engine
+title: "Deep Research Engine"
+tagline: "A 5-node pipeline (Ingest → Drafter → Critic → Neo4j → Synthesizer) that turns raw material into structured, queryable knowledge."
+index: "03"
+tier: marquee
+year: 2026
+role: "Architect + sole engineer"
+accent: magenta
+stack:
+  - Python
+  - LangGraph
+  - Neo4j
+  - LiteLLM
+  - LangFuse
+  - MCP
+  - pgvector
+links:
+  - label: GitHub
+    href: https://github.com/JayDataEngineer/deep-research-engine
+---
+
+A unified engine for autonomous research, ingestion, and knowledge-graph construction. Isolated, config-driven, and built to run multi-agent workflows without bespoke orchestration per task.
+
+## The five-node pipeline
+
+```
+   ┌────────────┐
+   │ Ingestion  │ (optional)  PDFs, images, audio → clean text
+   └─────┬──────┘
+         │
+   ┌─────▼──────┐
+   │  Drafter   │   Flash Subagents gather context,
+   │            │   Specialist Sub-sub-agents build the draft
+   └─────┬──────┘
+         │
+   ┌─────▼──────┐
+   │   Critic   │   Evaluates quality — either passes forward
+   │            │   or loops back to Drafter for refinement
+   └─────┬──────┘
+         │
+   ┌─────▼──────┐
+   │ Neo4j      │ (optional)  Extracts entities + relationships
+   │ Builder    │             into a persistent knowledge graph
+   └─────┬──────┘
+         │
+   ┌─────▼──────┐
+   │ Synthesizer│ (optional)  Formats output: reports, threads,
+   │            │             podcast scripts
+   └────────────┘
+```
+
+Every node except Drafter is optional. The pipeline is config-driven, so a research workflow is a YAML file, not a code change.
+
+## Generator-critic, done right
+
+The Critic isn't a vibe-check. It's a structured evaluator against the draft's research brief — coverage of sub-questions, factual support, internal consistency. When it loops back, the Drafter receives specific feedback, not a generic "try again."
+
+The Flash Subagents inside the Drafter run in parallel for breadth; the Specialist Sub-sub-agents run sequentially for depth on each flash result. This is a deliberate tradeoff — breadth-then-depth avoids the "every subagent says the same thing" failure mode of flat fan-out.
+
+## Knowledge graph persistence
+
+The optional Neo4j builder is where the engine gets interesting for repeated research. Entities and relationships are extracted from the draft and merged into a long-lived graph. Subsequent research queries can lean on prior extraction:
+
+- Run a research pass on "Qwen3 architecture" — entities and relationships land in Neo4j.
+- Later, run a research pass on "RoPE position embeddings" — the engine finds Qwen3's RoPE params already in the graph and uses them as ground truth.
+- After a few months, the graph becomes the project's institutional memory.
+
+## Infrastructure integration
+
+The engine is **fully strapped** into a shared-docker-infra environment:
+
+- **LiteLLM** — every model call routes through the LiteLLM gateway (port 4000 by default). Swap providers without touching code.
+- **LangFuse** — prompt management, versioning, and full trace observability. You can see exactly which subagent produced which paragraph of the draft.
+- **MCP** — tools execute through the Model Context Protocol for isolation and auditability.
+- **Databases** — pluggable support for PostgreSQL (pgvector), Neo4j, MongoDB, and MinIO.
+
+## Quick start
+
+```bash
+cp .env.example .env
+# Strapped to shared-docker-infra environment variables
+
+# Research workflow
+deep-research research "Explain quantum computing" --config rag.yaml
+
+# Ingestion + research
+deep-research research "Analyze these documents" \
+  --config pdf_summarizer.yaml \
+  --input ./my_docs/
+```
+
+## Why this isn't just "agents with steps"
+
+The difference between this and a `for` loop with LLM calls is the **boundary discipline**:
+
+1. **State contracts.** Each node has a typed input and output. The Critic can't drift into restructuring the draft — it can only accept or reject with specific feedback.
+2. **Idempotent ingestion.** The same input run twice produces the same graph state, no duplicates.
+3. **Provider-agnostic.** The engine doesn't know if it's running on GPT-4 or a local Qwen. LiteLLM handles the routing; the engine handles the orchestration.
+
+Most "agent pipelines" fail one of these. They let the LLM mutate state freely, they accumulate duplicates on retry, and they hardcode providers. This engine doesn't.
