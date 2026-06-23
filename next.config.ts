@@ -3,14 +3,9 @@ import createMDX from "@next/mdx";
 
 const nextConfig: NextConfig = {
   pageExtensions: ["js", "jsx", "ts", "tsx", "md", "mdx"],
+  output: "export",
   turbopack: {
     root: __dirname,
-  },
-  images: {
-    remotePatterns: [
-      { protocol: "https", hostname: "avatars.githubusercontent.com" },
-      { protocol: "https", hostname: "raw.githubusercontent.com" },
-    ],
   },
 };
 

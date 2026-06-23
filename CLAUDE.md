@@ -20,7 +20,7 @@ pnpm start        # serve production build
 - **TypeScript** (strict)
 - **Tailwind CSS v4** (CSS-first config in `src/app/globals.css`)
 - **Motion** (formerly Framer Motion) — scroll reveals, stagger
-- **React Three Fiber + custom GLSL** — hero particle field
+- **React Three Fiber + Three.js** — hero wireframe icosahedron with chromatic aberration
 - **MDX** — project detail pages in `src/content/projects/*.mdx`
 - **pnpm** as package manager
 
@@ -43,7 +43,7 @@ src/
   components/
     layout/             — Nav, Footer, ScrollProgress
     sections/           — Hero, Manifesto, Work, Range, About, Stack, Contact
-    three/              — HeroScene (Canvas), particles.ts (GLSL), LazyHeroScene
+    three/              — HeroScene (Canvas), LazyHeroScene
     motion/             — Reveal, Stagger (motion/react wrappers)
     ui/                 — Container, Section, Eyebrow, Tag, ArrowLink
   content/projects/     — MDX project files
@@ -91,14 +91,14 @@ Custom utilities: `.container-page`, `.text-gradient-cm`, `.bg-grid`, `.bg-dots`
 
 ## Deploy
 
-- Primary: Vercel. Push to `main`, deploy.
-- The site supports `output: 'export'` for self-hosting on Caddy later.
-- Replace `site.url` in `src/lib/site.ts` with the real domain before going live.
+- Primary: GitHub Pages via Actions. Push to `main` → `.github/workflows/deploy.yml` builds and deploys.
+- The site uses `output: 'export'` to produce static HTML in `out/`. No server runtime.
+- Live URL: `https://jaydataengineer.github.io/` (User Pages at root, no basePath needed).
+- `public/.nojekyll` prevents Pages' Jekyll pass from dropping `_next/`.
+- To self-host elsewhere (Caddy, etc.): `pnpm build` then serve the `out/` directory.
 
 ## TODO
 
-- [ ] Replace `site.url` placeholder with real domain
 - [ ] Real photo for About section
 - [ ] Project hero screenshots / demo GIFs
 - [ ] PDF résumé export (currently HTML only)
-- [ ] Configure deploy target

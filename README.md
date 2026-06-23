@@ -15,9 +15,16 @@ pnpm dev          # http://localhost:3000
 
 ## Build
 
+The site is configured for static export (`output: 'export'`). The build emits HTML/CSS/JS to `out/`.
+
 ```bash
-pnpm build && pnpm start
+pnpm build        # produces out/
+npx serve out     # preview the static build locally
 ```
+
+## Deploy
+
+Push to `main` triggers `.github/workflows/deploy.yml`, which builds and uploads `out/` to GitHub Pages. Live at `https://jaydataengineer.github.io/`.
 
 ## Architecture
 

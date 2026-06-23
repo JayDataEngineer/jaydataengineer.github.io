@@ -25,7 +25,7 @@ export const site = {
     "LLM",
     "agent orchestration",
   ] as string[],
-  url: "https://jay.engineer", // placeholder — replace with real domain
+  url: "https://jaydataengineer.github.io",
   email: "CodeEngineering@pm.me",
   github: "https://github.com/JayDataEngineer",
   // Initials for the avatar fallback block

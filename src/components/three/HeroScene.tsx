@@ -3,73 +3,25 @@
 import { Canvas, useFrame } from "@react-three/fiber";
 import { useMemo, useRef, useEffect } from "react";
 import * as THREE from "three";
-import { particleVertexShader, particleFragmentShader } from "./particles";
-
-const COUNT = 3500;
-const RADIUS = 2.35;
 
 /**
- * Fibonacci sphere distribution — perfectly even points on a sphere,
- * no clumping at the poles. Better than random for this aesthetic.
+ * The hero: a single wireframe icosahedron rendered three times at slightly
+ * different scales with additive blending. Where the three wireframes overlap
+ * they sum toward white; where they diverge you see the cyan / violet / magenta
+ * fringes that read as chromatic aberration. Slow autorotation + mouse
+ * parallax. Reduced-motion collapses to a static frame.
  */
-function fibonacciSphere(n: number, radius: number): THREE.BufferAttribute {
-  const positions = new Float32Array(n * 3);
-  const phi = Math.PI * (3 - Math.sqrt(5)); // golden angle
 
-  for (let i = 0; i < n; i++) {
-    const y = 1 - (i / (n - 1)) * 2; // -1..1
-    const r = Math.sqrt(1 - y * y);
-    const theta = phi * i;
-    const x = Math.cos(theta) * r;
-    const z = Math.sin(theta) * r;
-    positions[i * 3 + 0] = x * radius;
-    positions[i * 3 + 1] = y * radius;
-    positions[i * 3 + 2] = z * radius;
-  }
-  return new THREE.BufferAttribute(positions, 3);
-}
+const ICOSA_RADIUS = 1.7;
 
-function ParticleField() {
-  const pointsRef = useRef<THREE.Points>(null);
-  const matRef = useRef<THREE.ShaderMaterial>(null);
+function Icosahedron() {
+  const groupRef = useRef<THREE.Group>(null);
   const pointer = useRef({ x: 0, y: 0 });
 
-  // Build all geometry once.
-  const geometry = useMemo(() => {
-    const geo = new THREE.BufferGeometry();
-    const positions = fibonacciSphere(COUNT, RADIUS);
-
-    const scales = new Float32Array(COUNT);
-    const seeds = new Float32Array(COUNT);
-    const colors = new Float32Array(COUNT * 3);
-
-    // Color gradient stops: cyan (top) -> violet (middle) -> magenta (bottom).
-    const cTop = new THREE.Color("#00e7ff");
-    const cMid = new THREE.Color("#8b5cf6");
-    const cBot = new THREE.Color("#ff2bd6");
-
-    for (let i = 0; i < COUNT; i++) {
-      // Vary point size — most points small, a few larger "stars".
-      const r = Math.random();
-      scales[i] = r < 0.92 ? 6 + Math.random() * 14 : 24 + Math.random() * 30;
-      seeds[i] = Math.random() * 100;
-
-      const y = positions.array[i * 3 + 1] / RADIUS; // -1..1
-      const t = (y + 1) / 2; // 0..1
-      const color = t < 0.5
-        ? cTop.clone().lerp(cMid, t * 2)
-        : cMid.clone().lerp(cBot, (t - 0.5) * 2);
-      colors[i * 3 + 0] = color.r;
-      colors[i * 3 + 1] = color.g;
-      colors[i * 3 + 2] = color.b;
-    }
-
-    geo.setAttribute("position", positions);
-    geo.setAttribute("aScale", new THREE.BufferAttribute(scales, 1));
-    geo.setAttribute("aSeed", new THREE.BufferAttribute(seeds, 1));
-    geo.setAttribute("aColor", new THREE.BufferAttribute(colors, 3));
-    return geo;
-  }, []);
+  // One geometry, three materials — the wireframe detail=0 icosahedron has 20
+  // triangular faces and 30 unique edges; wireframe:true renders exactly those
+  // edges (no interior diagonals at detail=0).
+  const geometry = useMemo(() => new THREE.IcosahedronGeometry(ICOSA_RADIUS, 0), []);
 
   useEffect(() => {
     const onMove = (e: PointerEvent) => {
@@ -81,63 +33,70 @@ function ParticleField() {
   }, []);
 
   useFrame((state, delta) => {
-    if (!pointsRef.current || !matRef.current) return;
+    if (!groupRef.current) return;
 
-    // Slow autorotation — one full revolution every ~80s.
-    pointsRef.current.rotation.y += delta * 0.075;
+    // Slow autorotation — one revolution every ~40s on Y.
+    groupRef.current.rotation.y += delta * (Math.PI * 2) / 40;
 
-    // Mouse parallax — tilt the whole field slightly toward the pointer.
-    pointsRef.current.rotation.x = THREE.MathUtils.lerp(
-      pointsRef.current.rotation.x,
-      pointer.current.y * 0.18,
+    // Mouse parallax with a subtle slow wobble baked into the X target so the
+    // rig never feels fully static even when the pointer is centered.
+    const wobble = Math.sin(state.clock.elapsedTime * 0.15) * 0.08;
+    groupRef.current.rotation.x = THREE.MathUtils.lerp(
+      groupRef.current.rotation.x,
+      pointer.current.y * 0.18 + wobble,
       delta * 2,
     );
-    pointsRef.current.rotation.z = THREE.MathUtils.lerp(
-      pointsRef.current.rotation.z,
-      pointer.current.x * -0.04,
+    groupRef.current.rotation.z = THREE.MathUtils.lerp(
+      groupRef.current.rotation.z,
+      pointer.current.x * -0.10,
       delta * 2,
     );
-
-    matRef.current.uniforms.uTime.value = state.clock.elapsedTime;
   });
 
-  const uniforms = useMemo(
-    () => ({
-      uTime: { value: 0 },
-      uSize: { value: 28 },
-      uPixelRatio: {
-        value: Math.min(typeof window !== "undefined" ? window.devicePixelRatio : 1, 2),
-      },
-    }),
+  // Three passes — wide-enough scale deltas (±4%) that each color reads as a
+  // visible fringe rather than dissolving into a single white line. Violet is
+  // the core; cyan sits slightly inside, magenta slightly outside. Additive
+  // blending sums the overlap toward white.
+  const passes = useMemo(
+    () =>
+      [
+        { scale: 0.96, color: "#00e7ff", opacity: 0.7 }, // cyan, inner fringe
+        { scale: 1.0, color: "#8b5cf6", opacity: 0.95 }, // violet, core
+        { scale: 1.04, color: "#ff2bd6", opacity: 0.7 }, // magenta, outer fringe
+      ] as const,
     [],
   );
 
   return (
-    <points ref={pointsRef} geometry={geometry}>
-      <shaderMaterial
-        ref={matRef}
-        vertexShader={particleVertexShader}
-        fragmentShader={particleFragmentShader}
-        uniforms={uniforms}
-        transparent
-        depthWrite={false}
-        blending={THREE.AdditiveBlending}
-      />
-    </points>
+    <group ref={groupRef}>
+      {passes.map((p, i) => (
+        <mesh key={i} geometry={geometry} scale={p.scale}>
+          <meshBasicMaterial
+            color={p.color}
+            wireframe
+            transparent
+            opacity={p.opacity}
+            blending={THREE.AdditiveBlending}
+            depthWrite={false}
+            toneMapped={false}
+          />
+        </mesh>
+      ))}
+    </group>
   );
 }
 
 /**
- * Far-back starfield — sparse, large, slow. Adds parallax depth.
+ * Sparse starfield in a wide shell behind the icosahedron. Adds parallax depth
+ * without competing for attention.
  */
-function StarField() {
+function Halo() {
   const ref = useRef<THREE.Points>(null);
   const geo = useMemo(() => {
-    const n = 180;
+    const n = 320;
     const arr = new Float32Array(n * 3);
     for (let i = 0; i < n; i++) {
-      // Random in a large shell behind the main field.
-      const r = 8 + Math.random() * 6;
+      const r = 4.5 + Math.random() * 4;
       const theta = Math.random() * Math.PI * 2;
       const phi = Math.acos(2 * Math.random() - 1);
       arr[i * 3 + 0] = r * Math.sin(phi) * Math.cos(theta);
@@ -150,17 +109,17 @@ function StarField() {
   }, []);
 
   useFrame((_, delta) => {
-    if (ref.current) ref.current.rotation.y += delta * 0.01;
+    if (ref.current) ref.current.rotation.y += delta * 0.012;
   });
 
   return (
     <points ref={ref} geometry={geo}>
       <pointsMaterial
-        size={0.06}
+        size={0.045}
         sizeAttenuation
-        color="#ffffff"
+        color="#9aa3b8"
         transparent
-        opacity={0.5}
+        opacity={0.35}
         depthWrite={false}
       />
     </points>
@@ -170,15 +129,18 @@ function StarField() {
 export function HeroScene() {
   return (
     <Canvas
-      camera={{ position: [0, 0, 6], fov: 38 }}
-      dpr={[1, 2]}
-      gl={{ antialias: true, alpha: true, powerPreference: "high-performance" }}
+      camera={{ position: [0, 0, 4.2], fov: 38 }}
+      dpr={[1, 1.75]}
+      gl={{
+        antialias: true,
+        alpha: true,
+        powerPreference: "high-performance",
+      }}
       style={{ width: "100%", height: "100%" }}
     >
-      {/* Ambient light isn't needed (we use a custom shader) but fog adds depth. */}
-      <fog attach="fog" args={["#050507", 5.5, 12]} />
-      <StarField />
-      <ParticleField />
+      <fog attach="fog" args={["#050507", 5, 12]} />
+      <Halo />
+      <Icosahedron />
     </Canvas>
   );
 }
