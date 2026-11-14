@@ -1,0 +1,5 @@
+User-Agent: *
+Allow: /
+
+Host: jaydataengineer.github.io
+Sitemap: https://jaydataengineer.github.io/sitemap.xml
